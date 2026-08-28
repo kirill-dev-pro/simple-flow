@@ -31,6 +31,13 @@ public struct TranscriptionConfiguration: Equatable {
         self.model = model
     }
 
+    public var isGigaAM: Bool {
+        let lowerURL = baseURL.lowercased()
+        return lowerURL.contains("stt.iqdoc.ai") ||
+               lowerURL.contains("/api/v1") ||
+               lowerURL.hasSuffix("/transcribe")
+    }
+
     public func validate() throws {
         guard !token.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             throw TranscriptionConfigurationError.missingToken
@@ -61,9 +68,19 @@ public struct TranscriptionConfiguration: Equatable {
 
     public func validatedEndpoint() throws -> URL {
         let base = try validatedBaseURL()
-        if base.path.hasSuffix("/audio/transcriptions") || base.path == "/audio/transcriptions" {
-            return base
+        if isGigaAM {
+            if base.path.hasSuffix("/api/v1/transcribe") || base.path == "/api/v1/transcribe" {
+                return base
+            }
+            if base.path.hasSuffix("/api/v1") || base.path == "/api/v1" {
+                return base.appendingPathComponent("transcribe")
+            }
+            return base.appendingPathComponent("api").appendingPathComponent("v1").appendingPathComponent("transcribe")
+        } else {
+            if base.path.hasSuffix("/audio/transcriptions") || base.path == "/audio/transcriptions" {
+                return base
+            }
+            return base.appendingPathComponent("audio").appendingPathComponent("transcriptions")
         }
-        return base.appendingPathComponent("audio").appendingPathComponent("transcriptions")
     }
 }

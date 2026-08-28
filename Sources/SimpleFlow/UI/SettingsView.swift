@@ -13,15 +13,15 @@ public struct SettingsView: View {
     public var body: some View {
         Form {
             Section("API Configuration") {
-                TextField("Base URL", text: $viewModel.baseURL, prompt: Text("https://api.openai.com/v1"))
+                TextField("Base URL", text: $viewModel.baseURL, prompt: Text("https://stt.iqdoc.ai или https://api.openai.com/v1"))
                     .textFieldStyle(.roundedBorder)
 
                 HStack {
                     if viewModel.isTokenRevealed {
-                        TextField("API Token", text: $viewModel.token, prompt: Text("sk-..."))
+                        TextField("API Token / X-API-Key", text: $viewModel.token, prompt: Text("API токен..."))
                             .textFieldStyle(.roundedBorder)
                     } else {
-                        SecureField("API Token", text: $viewModel.token, prompt: Text("sk-..."))
+                        SecureField("API Token / X-API-Key", text: $viewModel.token, prompt: Text("API токен..."))
                             .textFieldStyle(.roundedBorder)
                     }
 
@@ -34,7 +34,7 @@ public struct SettingsView: View {
                     .help(viewModel.isTokenRevealed ? "Hide token" : "Show token")
                 }
 
-                TextField("Model", text: $viewModel.model, prompt: Text("gigaam"))
+                TextField("Model", text: $viewModel.model, prompt: Text("v3_e2e_rnnt или whisper-1"))
                     .textFieldStyle(.roundedBorder)
 
                 HStack {

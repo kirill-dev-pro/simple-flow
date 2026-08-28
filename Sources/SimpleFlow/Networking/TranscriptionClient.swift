@@ -64,6 +64,14 @@ public final class TranscriptionClient: Transcribing {
     }
 
     public func transcribe(fileURL: URL, configuration: TranscriptionConfiguration) async throws -> String {
+        if configuration.isGigaAM {
+            return try await transcribeGigaAM(fileURL: fileURL, configuration: configuration)
+        } else {
+            return try await transcribeOpenAI(fileURL: fileURL, configuration: configuration)
+        }
+    }
+
+    private func transcribeOpenAI(fileURL: URL, configuration: TranscriptionConfiguration) async throws -> String {
         let endpoint: URL
         do {
             try configuration.validate()
@@ -135,7 +143,146 @@ public final class TranscriptionClient: Transcribing {
         }
     }
 
+    private func transcribeGigaAM(fileURL: URL, configuration: TranscriptionConfiguration) async throws -> String {
+        let endpoint: URL
+        let base: URL
+        do {
+            try configuration.validate()
+            endpoint = try configuration.validatedEndpoint()
+            base = try configuration.validatedBaseURL()
+        } catch {
+            AppLogger.network.error("GigaAM configuration validation failed: \(error.localizedDescription, privacy: .public)")
+            throw TranscriptionError.invalidConfiguration(error.localizedDescription)
+        }
+
+        guard let fileData = try? Data(contentsOf: fileURL), !fileData.isEmpty else {
+            AppLogger.network.error("GigaAM transcribe failed: audio file unavailable or empty")
+            throw TranscriptionError.fileUnavailable
+        }
+
+        AppLogger.network.info("Starting GigaAM transcribe request (payload size: \(fileData.count) bytes)")
+
+        let (bodyData, contentType, _) = MultipartFormData.createGigaAMTranscriptionBody(fileData: fileData)
+
+        var request = URLRequest(url: endpoint)
+        request.httpMethod = "POST"
+        request.setValue(configuration.token, forHTTPHeaderField: "X-API-Key")
+        request.setValue(contentType, forHTTPHeaderField: "Content-Type")
+        request.timeoutInterval = 60
+
+        let responseData: Data
+        let response: URLResponse
+        do {
+            (responseData, response) = try await session.upload(for: request, from: bodyData)
+        } catch let urlError as URLError {
+            AppLogger.network.error("GigaAM network transport error: \(urlError.code.rawValue)")
+            throw TranscriptionError.transport(urlError.code)
+        } catch {
+            AppLogger.network.error("GigaAM unknown transport error")
+            throw TranscriptionError.transport(.unknown)
+        }
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            AppLogger.network.error("GigaAM transcribe failed: non-HTTP response received")
+            throw TranscriptionError.malformedResponse
+        }
+
+        AppLogger.network.info("GigaAM upload HTTP status: \(httpResponse.statusCode)")
+
+        guard (200...299).contains(httpResponse.statusCode) else {
+            if httpResponse.statusCode == 401 || httpResponse.statusCode == 403 {
+                throw TranscriptionError.unauthorized
+            }
+            throw TranscriptionError.server(status: httpResponse.statusCode)
+        }
+
+        struct GigaAMUploadResponse: Decodable {
+            let task_id: String
+        }
+
+        guard let uploadResponse = try? JSONDecoder().decode(GigaAMUploadResponse.self, from: responseData) else {
+            AppLogger.network.error("GigaAM failed to decode task_id from upload response")
+            throw TranscriptionError.malformedResponse
+        }
+
+        let taskId = uploadResponse.task_id
+        AppLogger.network.info("GigaAM task created: \(taskId, privacy: .public)")
+
+        // Poll task result
+        let resultURL = base.appendingPathComponent("api").appendingPathComponent("v1").appendingPathComponent("tasks").appendingPathComponent(taskId).appendingPathComponent("result")
+
+        struct GigaAMTaskResult: Decodable {
+            let task_id: String
+            let status: String
+            let transcription: String?
+            let transcription_with_timecodes: String?
+        }
+
+        let startTime = Date()
+        let maxPollingDuration: TimeInterval = 60
+
+        while Date().timeIntervalSince(startTime) < maxPollingDuration {
+            var pollRequest = URLRequest(url: resultURL)
+            pollRequest.httpMethod = "GET"
+            pollRequest.setValue(configuration.token, forHTTPHeaderField: "X-API-Key")
+            pollRequest.timeoutInterval = 10
+
+            let pollData: Data
+            let pollResponse: URLResponse
+            do {
+                (pollData, pollResponse) = try await session.data(for: pollRequest)
+            } catch let urlError as URLError {
+                throw TranscriptionError.transport(urlError.code)
+            } catch {
+                throw TranscriptionError.transport(.unknown)
+            }
+
+            guard let pollHTTP = pollResponse as? HTTPURLResponse else {
+                throw TranscriptionError.malformedResponse
+            }
+
+            if pollHTTP.statusCode == 200 {
+                if let taskResult = try? JSONDecoder().decode(GigaAMTaskResult.self, from: pollData) {
+                    if taskResult.status == "completed" {
+                        let text = (taskResult.transcription ?? taskResult.transcription_with_timecodes ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+                        guard !text.isEmpty else {
+                            throw TranscriptionError.noSpeech
+                        }
+                        AppLogger.network.info("GigaAM transcription completed successfully (length: \(text.count))")
+
+                        // Asynchronously clean up task
+                        Task.detached { [session, configuration, taskId, base] in
+                            var delRequest = URLRequest(url: base.appendingPathComponent("api").appendingPathComponent("v1").appendingPathComponent("tasks").appendingPathComponent(taskId))
+                            delRequest.httpMethod = "DELETE"
+                            delRequest.setValue(configuration.token, forHTTPHeaderField: "X-API-Key")
+                            _ = try? await session.data(for: delRequest)
+                        }
+
+                        return text
+                    } else if taskResult.status == "failed" {
+                        AppLogger.network.error("GigaAM task status reported failed")
+                        throw TranscriptionError.server(status: 500)
+                    }
+                }
+            } else if pollHTTP.statusCode == 401 || pollHTTP.statusCode == 403 {
+                throw TranscriptionError.unauthorized
+            }
+
+            try await Task.sleep(nanoseconds: 150_000_000) // 150ms
+        }
+
+        throw TranscriptionError.transport(.timedOut)
+    }
+
     public func testConnection(configuration: TranscriptionConfiguration) async -> ConnectionTestResult {
+        if configuration.isGigaAM {
+            return await testConnectionGigaAM(configuration: configuration)
+        } else {
+            return await testConnectionOpenAI(configuration: configuration)
+        }
+    }
+
+    private func testConnectionOpenAI(configuration: TranscriptionConfiguration) async -> ConnectionTestResult {
         AppLogger.network.info("Starting connection test")
         let modelsURL: URL
         do {
@@ -191,5 +338,49 @@ public final class TranscriptionClient: Transcribing {
         }
         AppLogger.network.info("Connection test finished with result: \(String(describing: result), privacy: .public)")
         return result
+    }
+
+    private func testConnectionGigaAM(configuration: TranscriptionConfiguration) async -> ConnectionTestResult {
+        AppLogger.network.info("Starting GigaAM connection test")
+        let base: URL
+        do {
+            try configuration.validate()
+            base = try configuration.validatedBaseURL()
+        } catch {
+            return .invalidConfiguration(error.localizedDescription)
+        }
+
+        let optionsURL = base.appendingPathComponent("api").appendingPathComponent("v1").appendingPathComponent("asr").appendingPathComponent("options")
+        var request = URLRequest(url: optionsURL)
+        request.httpMethod = "GET"
+        request.setValue(configuration.token, forHTTPHeaderField: "X-API-Key")
+        request.timeoutInterval = 10
+
+        do {
+            let (_, response) = try await session.data(for: request)
+            if let http = response as? HTTPURLResponse {
+                if (200...299).contains(http.statusCode) {
+                    return .reachable
+                } else if http.statusCode == 401 || http.statusCode == 403 || http.statusCode == 422 {
+                    return .unauthorized
+                }
+            }
+        } catch let urlError as URLError {
+            return .transport(urlError.code)
+        } catch {
+            return .transport(.unknown)
+        }
+
+        // Fallback to /health check
+        let healthURL = base.appendingPathComponent("health")
+        var healthRequest = URLRequest(url: healthURL)
+        healthRequest.httpMethod = "GET"
+        healthRequest.timeoutInterval = 10
+        if let (_, healthResponse) = try? await session.data(for: healthRequest),
+           let http = healthResponse as? HTTPURLResponse, (200...299).contains(http.statusCode) {
+            return .reachable
+        }
+
+        return .server(status: -1)
     }
 }

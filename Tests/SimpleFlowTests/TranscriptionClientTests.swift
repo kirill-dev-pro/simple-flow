@@ -339,5 +339,57 @@ final class TranscriptionClientTests: XCTestCase {
         let capturedRequest = MockURLProtocol.lastCapturedRequest
         XCTAssertEqual(capturedRequest?.url?.path, "/v1/models")
     }
+
+    func testGigaAMTranscribeSuccess() async throws {
+        let gigaConfig = TranscriptionConfiguration(
+            baseURL: "https://stt.iqdoc.ai",
+            token: "giga-secret-token",
+            model: "v3_e2e_rnnt"
+        )
+        XCTAssertTrue(gigaConfig.isGigaAM)
+
+        var callCount = 0
+        MockURLProtocol.requestHandler = { request in
+            callCount += 1
+            if request.httpMethod == "POST" {
+                XCTAssertEqual(request.value(forHTTPHeaderField: "X-API-Key"), "giga-secret-token")
+                XCTAssertEqual(request.url?.path, "/api/v1/transcribe")
+                let json = #"{"task_id":"task-123","message":"Uploaded","filename":"audio.wav","file_size":100}"#
+                let response = HTTPURLResponse(url: request.url!, statusCode: 202, httpVersion: nil, headerFields: nil)!
+                return (response, json.data(using: .utf8)!)
+            } else if request.httpMethod == "GET" {
+                XCTAssertEqual(request.value(forHTTPHeaderField: "X-API-Key"), "giga-secret-token")
+                XCTAssertEqual(request.url?.path, "/api/v1/tasks/task-123/result")
+                let json = #"{"task_id":"task-123","status":"completed","filename":"audio.wav","transcription":"Привет мир"}"#
+                let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+                return (response, json.data(using: .utf8)!)
+            } else if request.httpMethod == "DELETE" {
+                let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+                return (response, Data())
+            }
+            throw URLError(.badServerResponse)
+        }
+
+        let result = try await client.transcribe(fileURL: fixtureWAV, configuration: gigaConfig)
+        XCTAssertEqual(result, "Привет мир")
+    }
+
+    func testGigaAMTestConnectionReachable() async {
+        let gigaConfig = TranscriptionConfiguration(
+            baseURL: "https://stt.iqdoc.ai",
+            token: "giga-secret-token",
+            model: "v3_e2e_rnnt"
+        )
+
+        MockURLProtocol.requestHandler = { request in
+            XCTAssertEqual(request.value(forHTTPHeaderField: "X-API-Key"), "giga-secret-token")
+            XCTAssertEqual(request.url?.path, "/api/v1/asr/options")
+            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            return (response, Data())
+        }
+
+        let result = await client.testConnection(configuration: gigaConfig)
+        XCTAssertEqual(result, .reachable)
+    }
 }
 

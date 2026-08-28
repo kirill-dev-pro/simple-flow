@@ -22,6 +22,8 @@ public final class FloatingHUDController: HUDPresenting {
     private var hostingView: NSHostingView<FloatingHUDView>?
     private var currentState = FloatingHUDState()
 
+    private var autoHideTask: Task<Void, Never>?
+
     public init() {}
 
     private func ensurePanel() -> NonActivatingPanel {
@@ -29,12 +31,14 @@ public final class FloatingHUDController: HUDPresenting {
             return panel
         }
 
-        let initialView = FloatingHUDView(state: currentState)
+        let initialView = FloatingHUDView(state: currentState) { [weak self] in
+            self?.hide()
+        }
         let hostingView = NSHostingView(rootView: initialView)
         self.hostingView = hostingView
 
         let panel = NonActivatingPanel(
-            contentRect: NSRect(x: 0, y: 0, width: 300, height: 48),
+            contentRect: NSRect(x: 0, y: 0, width: 320, height: 48),
             styleMask: [.nonactivatingPanel, .borderless],
             backing: .buffered,
             defer: false
@@ -53,6 +57,9 @@ public final class FloatingHUDController: HUDPresenting {
     }
 
     public func show(_ phase: DictationPhase) {
+        autoHideTask?.cancel()
+        autoHideTask = nil
+
         if phase == .idle {
             hide()
             return
@@ -68,6 +75,21 @@ public final class FloatingHUDController: HUDPresenting {
         }
 
         updateViewAndPosition()
+
+        if case .feedback(let kind) = phase {
+            let delay: TimeInterval
+            switch kind {
+            case .error:
+                delay = 3.0
+            default:
+                delay = 1.5
+            }
+            autoHideTask = Task { @MainActor [weak self] in
+                try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+                guard !Task.isCancelled else { return }
+                self?.hide()
+            }
+        }
     }
 
     public func showLimitWarning() {
@@ -77,13 +99,17 @@ public final class FloatingHUDController: HUDPresenting {
     }
 
     public func hide() {
+        autoHideTask?.cancel()
+        autoHideTask = nil
         currentState = FloatingHUDState()
         panel?.orderOut(nil)
     }
 
     private func updateViewAndPosition() {
         let panel = ensurePanel()
-        hostingView?.rootView = FloatingHUDView(state: currentState)
+        hostingView?.rootView = FloatingHUDView(state: currentState) { [weak self] in
+            self?.hide()
+        }
 
         hostingView?.layoutSubtreeIfNeeded()
         let fittingSize = hostingView?.fittingSize ?? NSSize(width: 260, height: 48)

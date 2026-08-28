@@ -47,4 +47,13 @@ public struct MultipartFormData: Sendable {
         form.addFile(name: "file", filename: "audio.wav", contentType: "audio/wav", data: fileData)
         return (form.build(), form.contentType, boundary)
     }
+
+    public static func createGigaAMTranscriptionBody(
+        fileData: Data,
+        boundary: String = "Boundary-\(UUID().uuidString)"
+    ) -> (data: Data, contentType: String, boundary: String) {
+        var form = MultipartFormData(boundary: boundary)
+        form.addFile(name: "file", filename: "audio.wav", contentType: "audio/wav", data: fileData)
+        return (form.build(), form.contentType, boundary)
+    }
 }

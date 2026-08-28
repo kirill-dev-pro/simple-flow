@@ -18,9 +18,11 @@ public struct FloatingHUDState: Equatable, Sendable {
 
 public struct FloatingHUDView: View {
     public let state: FloatingHUDState
+    public var onDismiss: (() -> Void)?
 
-    public init(state: FloatingHUDState) {
+    public init(state: FloatingHUDState, onDismiss: (() -> Void)? = nil) {
         self.state = state
+        self.onDismiss = onDismiss
     }
 
     public var body: some View {
@@ -37,6 +39,9 @@ public struct FloatingHUDView: View {
                     Capsule()
                         .stroke(Color.primary.opacity(0.12), lineWidth: 0.5)
                 }
+        }
+        .onTapGesture {
+            onDismiss?()
         }
         .animation(.easeInOut(duration: 0.2), value: state.phase)
         .animation(.easeInOut(duration: 0.2), value: state.isLimitWarning)
@@ -139,7 +144,8 @@ public struct FloatingHUDView: View {
                     .imageScale(.medium)
                 Text(message)
                     .font(.system(size: 13, weight: .medium))
-                    .lineLimit(2)
+                    .lineLimit(1)
+                    .fixedSize(horizontal: true, vertical: false)
             }
         }
     }
