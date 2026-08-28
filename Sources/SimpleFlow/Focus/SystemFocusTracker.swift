@@ -38,11 +38,13 @@ public final class SystemFocusTracker: FocusTracking, @unchecked Sendable {
         var roleValue: CFTypeRef?
         let roleResult = AXUIElementCopyAttributeValue(element, kAXRoleAttribute as CFString, &roleValue)
         if roleResult == .success, let role = roleValue as? String {
-            if role == (kAXTextFieldRole as String) ||
-               role == (kAXTextAreaRole as String) ||
-               role == (kAXComboBoxRole as String) {
-                return true
+            if role == (kAXMenuBarRole as String) ||
+               role == (kAXMenuRole as String) ||
+               role == (kAXMenuItemRole as String) ||
+               role == (kAXApplicationRole as String) {
+                return false
             }
+            return true
         }
 
         var isValueSettable: DarwinBoolean = false

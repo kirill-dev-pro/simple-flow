@@ -259,6 +259,9 @@ public final class AppCoordinator: ObservableObject {
         let matches: Bool
         if let originalFocus = originalFocus {
             matches = focusTracker.stillMatches(originalFocus)
+        } else if let current = focusTracker.capture() {
+            originalFocus = current
+            matches = true
         } else {
             matches = false
         }
