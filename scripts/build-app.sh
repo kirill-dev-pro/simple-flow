@@ -33,6 +33,9 @@ mkdir -p "${MACOS_DIR}" "${RESOURCES_DIR}"
 
 cp "${EXECUTABLE}" "${MACOS_DIR}/SimpleFlow"
 cp "${REPO_ROOT}/Packaging/Info.plist" "${CONTENTS_DIR}/Info.plist"
+if [ -f "${REPO_ROOT}/Packaging/AppIcon.icns" ]; then
+    cp "${REPO_ROOT}/Packaging/AppIcon.icns" "${RESOURCES_DIR}/AppIcon.icns"
+fi
 
 echo "Signing SimpleFlow.app..."
 codesign --force --sign - "${APP_BUNDLE}"
