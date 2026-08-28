@@ -265,8 +265,10 @@ and open the relevant System Settings page. Do not request unrelated access.
 ## Error handling
 
 - Missing microphone permission: do not record; show an action to grant access.
-- Missing Accessibility permission: recording may proceed, but the UI must make
-  clear that automatic insertion is unavailable and the result will be saved.
+- Missing Accessibility permission: global Fn monitoring and automatic
+  insertion are unavailable, so push-to-talk does not start. If access is
+  revoked during an active recording, finish transcription and save the result
+  to history without attempting insertion.
 - Microphone unavailable or disconnected: stop, delete audio, and show an error.
 - Invalid URL, missing model, or missing token: fail before recording upload.
 - Offline, timeout, or non-2xx response: delete audio and show a concise error.
