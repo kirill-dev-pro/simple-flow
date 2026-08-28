@@ -58,8 +58,11 @@ public final class OnboardingViewModel: ObservableObject {
         permissionManager.openAccessibilitySettings()
     }
 
+    public var onFinish: (@MainActor () -> Void)?
+
     public func finish() {
         guard canFinish else { return }
         settingsStore.hasCompletedOnboarding = true
+        onFinish?()
     }
 }

@@ -376,4 +376,47 @@ final class AudioRecorderTests: XCTestCase {
         XCTAssertNil(fallbackReportedUID.value)
         await recorder.cancel()
     }
+
+    // MARK: - Abandoned Recordings Cleanup Tests
+
+    func testCleanupAbandonedRecordingsRemovesOnlyOldWAVFiles() throws {
+        let dedicatedDir = temporaryDirectory.appendingPathComponent("DedicatedRecordings", isDirectory: true)
+        let outsideDir = temporaryDirectory.appendingPathComponent("OutsideDir", isDirectory: true)
+        try FileManager.default.createDirectory(at: dedicatedDir, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: outsideDir, withIntermediateDirectories: true)
+
+        let oldDate = Date().addingTimeInterval(-3700)
+        let newDate = Date().addingTimeInterval(-60)
+
+        let oldWavURL = dedicatedDir.appendingPathComponent("recording-old.wav")
+        let newWavURL = dedicatedDir.appendingPathComponent("recording-new.wav")
+        let oldTxtURL = dedicatedDir.appendingPathComponent("notes-old.txt")
+        let outsideOldWavURL = outsideDir.appendingPathComponent("recording-outside-old.wav")
+
+        FileManager.default.createFile(atPath: oldWavURL.path, contents: Data([0x01, 0x02]))
+        try FileManager.default.setAttributes([.creationDate: oldDate, .modificationDate: oldDate], ofItemAtPath: oldWavURL.path)
+
+        FileManager.default.createFile(atPath: newWavURL.path, contents: Data([0x03, 0x04]))
+        try FileManager.default.setAttributes([.creationDate: newDate, .modificationDate: newDate], ofItemAtPath: newWavURL.path)
+
+        FileManager.default.createFile(atPath: oldTxtURL.path, contents: Data([0x05, 0x06]))
+        try FileManager.default.setAttributes([.creationDate: oldDate, .modificationDate: oldDate], ofItemAtPath: oldTxtURL.path)
+
+        FileManager.default.createFile(atPath: outsideOldWavURL.path, contents: Data([0x07, 0x08]))
+        try FileManager.default.setAttributes([.creationDate: oldDate, .modificationDate: oldDate], ofItemAtPath: outsideOldWavURL.path)
+
+        let deletedCount = AudioRecorder.cleanupAbandonedRecordings(in: dedicatedDir, olderThan: 3600)
+
+        XCTAssertEqual(deletedCount, 1)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: oldWavURL.path), "Old WAV file in dedicated directory should be removed")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: newWavURL.path), "New WAV file in dedicated directory should be kept")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: oldTxtURL.path), "Non-WAV file should be kept")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: outsideOldWavURL.path), "Old WAV file outside dedicated directory should be kept")
+    }
+
+    func testCleanupAbandonedRecordingsWhenDirectoryDoesNotExistDoesNotThrow() {
+        let nonExistentDir = temporaryDirectory.appendingPathComponent("NonExistentDir_\(UUID().uuidString)")
+        let deletedCount = AudioRecorder.cleanupAbandonedRecordings(in: nonExistentDir, olderThan: 3600)
+        XCTAssertEqual(deletedCount, 0)
+    }
 }

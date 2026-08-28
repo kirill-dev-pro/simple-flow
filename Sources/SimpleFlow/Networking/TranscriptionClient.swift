@@ -69,12 +69,16 @@ public final class TranscriptionClient: Transcribing {
             try configuration.validate()
             endpoint = try configuration.validatedEndpoint()
         } catch {
+            AppLogger.network.error("Transcribe configuration validation failed: \(error.localizedDescription, privacy: .public)")
             throw TranscriptionError.invalidConfiguration(error.localizedDescription)
         }
 
         guard let fileData = try? Data(contentsOf: fileURL), !fileData.isEmpty else {
+            AppLogger.network.error("Transcribe failed: audio file unavailable or empty")
             throw TranscriptionError.fileUnavailable
         }
+
+        AppLogger.network.info("Starting transcribe request (model: \(configuration.model, privacy: .public), payload size: \(fileData.count) bytes)")
 
         let (bodyData, contentType, _) = MultipartFormData.createTranscriptionBody(
             model: configuration.model,
@@ -92,14 +96,19 @@ public final class TranscriptionClient: Transcribing {
         do {
             (responseData, response) = try await session.upload(for: request, from: bodyData)
         } catch let urlError as URLError {
+            AppLogger.network.error("Transcribe network transport error: \(urlError.code.rawValue)")
             throw TranscriptionError.transport(urlError.code)
         } catch {
+            AppLogger.network.error("Transcribe unknown transport error")
             throw TranscriptionError.transport(.unknown)
         }
 
         guard let httpResponse = response as? HTTPURLResponse else {
+            AppLogger.network.error("Transcribe failed: non-HTTP response received")
             throw TranscriptionError.malformedResponse
         }
+
+        AppLogger.network.info("Transcribe HTTP response status: \(httpResponse.statusCode)")
 
         switch httpResponse.statusCode {
         case 200...299:
@@ -107,21 +116,27 @@ public final class TranscriptionClient: Transcribing {
                 let text: String
             }
             guard let decoded = try? JSONDecoder().decode(ResponsePayload.self, from: responseData) else {
+                AppLogger.network.error("Transcribe failed: malformed JSON response")
                 throw TranscriptionError.malformedResponse
             }
             let trimmed = decoded.text.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !trimmed.isEmpty else {
+                AppLogger.network.warning("Transcribe completed with empty speech text")
                 throw TranscriptionError.noSpeech
             }
+            AppLogger.network.info("Transcribe succeeded (length: \(trimmed.count) characters)")
             return trimmed
         case 401, 403:
+            AppLogger.network.error("Transcribe failed: unauthorized (\(httpResponse.statusCode))")
             throw TranscriptionError.unauthorized
         default:
+            AppLogger.network.error("Transcribe failed: server error (\(httpResponse.statusCode))")
             throw TranscriptionError.server(status: httpResponse.statusCode)
         }
     }
 
     public func testConnection(configuration: TranscriptionConfiguration) async -> ConnectionTestResult {
+        AppLogger.network.info("Starting connection test")
         let modelsURL: URL
         do {
             try configuration.validate()
@@ -132,7 +147,9 @@ public final class TranscriptionClient: Transcribing {
                 modelsURL = base.appendingPathComponent("models")
             }
         } catch {
-            return .invalidConfiguration(error.localizedDescription)
+            let result = ConnectionTestResult.invalidConfiguration(error.localizedDescription)
+            AppLogger.network.error("Connection test failed configuration validation: \(error.localizedDescription, privacy: .public)")
+            return result
         }
 
         var request = URLRequest(url: modelsURL)
@@ -144,24 +161,35 @@ public final class TranscriptionClient: Transcribing {
         do {
             (_, response) = try await session.data(for: request)
         } catch let urlError as URLError {
-            return .transport(urlError.code)
+            let result = ConnectionTestResult.transport(urlError.code)
+            AppLogger.network.error("Connection test transport error: \(urlError.code.rawValue)")
+            return result
         } catch {
-            return .transport(.unknown)
+            let result = ConnectionTestResult.transport(.unknown)
+            AppLogger.network.error("Connection test unknown transport error")
+            return result
         }
 
         guard let httpResponse = response as? HTTPURLResponse else {
-            return .server(status: -1)
+            let result = ConnectionTestResult.server(status: -1)
+            AppLogger.network.error("Connection test non-HTTP response")
+            return result
         }
 
+        AppLogger.network.info("Connection test HTTP response status: \(httpResponse.statusCode)")
+
+        let result: ConnectionTestResult
         switch httpResponse.statusCode {
         case 200...299:
-            return .reachable
+            result = .reachable
         case 401, 403:
-            return .unauthorized
+            result = .unauthorized
         case 404, 405:
-            return .modelsEndpointUnsupported
+            result = .modelsEndpointUnsupported
         default:
-            return .server(status: httpResponse.statusCode)
+            result = .server(status: httpResponse.statusCode)
         }
+        AppLogger.network.info("Connection test finished with result: \(String(describing: result), privacy: .public)")
+        return result
     }
 }

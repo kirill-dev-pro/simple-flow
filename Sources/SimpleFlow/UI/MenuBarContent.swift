@@ -112,5 +112,6 @@ public struct MenuBarContent: View {
         guard let latest = records.first?.text else { return }
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(latest, forType: .string)
+        AppLogger.insertion.debug("Copied latest transcript to pasteboard from menu bar")
     }
 }

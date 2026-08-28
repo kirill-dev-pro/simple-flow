@@ -78,11 +78,13 @@ public final class TextInserter: TextInserting, @unchecked Sendable {
     }
 
     public func insert(_ text: String) async -> InsertionResult {
+        AppLogger.insertion.info("Attempting text insertion (length: \(text.count) characters)")
         let previousSnapshot = pasteboard.snapshot()
         let insertedChangeCount = pasteboard.writeString(text)
 
         let posted = eventPoster.postPasteCommand()
         guard posted else {
+            AppLogger.insertion.error("Failed to post synthetic paste command, restoring pasteboard")
             pasteboard.restore(previousSnapshot, matchingChangeCount: insertedChangeCount)
             return .pasteFailed
         }
@@ -91,6 +93,7 @@ public final class TextInserter: TextInserting, @unchecked Sendable {
             pasteboard.restore(previousSnapshot, matchingChangeCount: insertedChangeCount)
         }
 
+        AppLogger.insertion.info("Text insertion completed with result: inserted")
         return .inserted
     }
 }

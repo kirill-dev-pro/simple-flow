@@ -61,14 +61,30 @@ public final class SystemFocusTracker: FocusTracking, @unchecked Sendable {
     }
 
     public func capture() -> FocusSnapshot? {
-        guard let app = frontmostAppProvider() else { return nil }
-        guard let element = systemWideElementProvider() else { return nil }
-        guard editableValidator(element) else { return nil }
-        return FocusSnapshot(applicationPID: app.pid, applicationName: app.name, element: element)
+        guard let app = frontmostAppProvider() else {
+            AppLogger.focus.debug("No frontmost application available")
+            return nil
+        }
+        guard let element = systemWideElementProvider() else {
+            AppLogger.focus.debug("No focused Accessibility element in application: \(app.name ?? "unknown", privacy: .public)")
+            return nil
+        }
+        guard editableValidator(element) else {
+            AppLogger.focus.debug("Focused element is not editable in application: \(app.name ?? "unknown", privacy: .public)")
+            return nil
+        }
+        let snapshot = FocusSnapshot(applicationPID: app.pid, applicationName: app.name, element: element)
+        AppLogger.focus.debug("Captured focus: app=\(app.name ?? "unknown", privacy: .public), pid=\(app.pid)")
+        return snapshot
     }
 
     public func stillMatches(_ snapshot: FocusSnapshot) -> Bool {
-        guard let current = capture() else { return false }
-        return current.matches(snapshot)
+        guard let current = capture() else {
+            AppLogger.focus.info("Focus validation failed: no current editable focus found (targetApp: \(snapshot.applicationName ?? "unknown", privacy: .public))")
+            return false
+        }
+        let matches = current.matches(snapshot)
+        AppLogger.focus.info("Focus validation: stillMatches=\(matches), targetApp=\(snapshot.applicationName ?? "unknown", privacy: .public), currentApp=\(current.applicationName ?? "unknown", privacy: .public)")
+        return matches
     }
 }

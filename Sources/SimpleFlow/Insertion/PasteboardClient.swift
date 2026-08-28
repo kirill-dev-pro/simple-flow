@@ -43,6 +43,7 @@ public final class PasteboardClient: PasteboardManaging, @unchecked Sendable {
 
     public func snapshot() -> PasteboardSnapshot {
         guard let items = pasteboard.pasteboardItems, !items.isEmpty else {
+            AppLogger.insertion.debug("Captured empty pasteboard snapshot")
             return PasteboardSnapshot(items: [])
         }
 
@@ -56,6 +57,7 @@ public final class PasteboardClient: PasteboardManaging, @unchecked Sendable {
             return PasteboardItemSnapshot(representations: representations)
         }
 
+        AppLogger.insertion.debug("Captured pasteboard snapshot (\(itemSnapshots.count) items)")
         return PasteboardSnapshot(items: itemSnapshots)
     }
 
@@ -63,17 +65,20 @@ public final class PasteboardClient: PasteboardManaging, @unchecked Sendable {
     public func writeString(_ text: String) -> Int {
         pasteboard.clearContents()
         pasteboard.setString(text, forType: .string)
+        AppLogger.insertion.debug("Wrote text to pasteboard (length: \(text.count) characters, changeCount: \(self.pasteboard.changeCount))")
         return pasteboard.changeCount
     }
 
     @discardableResult
     public func restore(_ snapshot: PasteboardSnapshot, matchingChangeCount expectedChangeCount: Int) -> Bool {
         guard pasteboard.changeCount == expectedChangeCount else {
+            AppLogger.insertion.info("Pasteboard restoration skipped: changeCount mismatch (current: \(self.pasteboard.changeCount), expected: \(expectedChangeCount))")
             return false
         }
 
         pasteboard.clearContents()
         guard !snapshot.items.isEmpty else {
+            AppLogger.insertion.debug("Restored empty pasteboard snapshot")
             return true
         }
 
@@ -90,6 +95,7 @@ public final class PasteboardClient: PasteboardManaging, @unchecked Sendable {
             pasteboard.writeObjects(objects)
         }
 
+        AppLogger.insertion.debug("Restored pasteboard snapshot (\(snapshot.items.count) items)")
         return true
     }
 }

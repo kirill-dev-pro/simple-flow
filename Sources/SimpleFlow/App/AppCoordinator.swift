@@ -42,6 +42,7 @@ public final class AppCoordinator: ObservableObject {
     }
 
     public func start() {
+        AppLogger.lifecycle.info("AppCoordinator starting")
         audioRecorder.onLimitWarning = { [weak self] in
             if Thread.isMainThread {
                 MainActor.assumeIsolated {
@@ -79,12 +80,15 @@ public final class AppCoordinator: ObservableObject {
                     self?.handleEscapePressed()
                 }
             )
+            AppLogger.lifecycle.info("AppCoordinator started successfully")
         } catch {
+            AppLogger.lifecycle.error("Failed to start hotkey monitor: \(error.localizedDescription, privacy: .public)")
             handleFailure(error)
         }
     }
 
     public func restartHotkeyMonitor() {
+        AppLogger.lifecycle.info("Restarting hotkey monitor")
         hotkeyMonitor.stop()
         do {
             try hotkeyMonitor.start(
@@ -99,12 +103,15 @@ public final class AppCoordinator: ObservableObject {
                     self?.handleEscapePressed()
                 }
             )
+            AppLogger.lifecycle.info("Hotkey monitor restarted successfully")
         } catch {
+            AppLogger.lifecycle.error("Failed to restart hotkey monitor: \(error.localizedDescription, privacy: .public)")
             handleFailure(error)
         }
     }
 
     public func stop() {
+        AppLogger.lifecycle.info("Stopping AppCoordinator")
         hotkeyMonitor.stop()
         audioRecorder.onLimitWarning = nil
         audioRecorder.onLimitReached = nil
@@ -133,6 +140,7 @@ public final class AppCoordinator: ObservableObject {
 
         phase = stateMachine.phase
         hudPresenter.show(phase)
+        AppLogger.lifecycle.debug("Hotkey pressed, transitioned phase to: \(String(describing: self.phase), privacy: .public)")
 
         if effects.contains(.captureFocus) {
             originalFocus = focusTracker.capture()
@@ -157,6 +165,7 @@ public final class AppCoordinator: ObservableObject {
 
         phase = stateMachine.phase
         hudPresenter.show(phase)
+        AppLogger.lifecycle.debug("Hotkey released, transitioned phase to: \(String(describing: self.phase), privacy: .public)")
 
         if effects.contains(.stopAndTranscribe) {
             activeDictationTask = Task { @MainActor [weak self] in
@@ -171,6 +180,7 @@ public final class AppCoordinator: ObservableObject {
 
         phase = stateMachine.phase
         hudPresenter.show(phase)
+        AppLogger.lifecycle.info("Recording limit reached (5:00), transitioning to transcribing")
 
         if effects.contains(.stopAndTranscribe) {
             activeDictationTask = Task { @MainActor [weak self] in
@@ -181,6 +191,7 @@ public final class AppCoordinator: ObservableObject {
 
     public func handleLimitWarning() {
         guard phase == .recording else { return }
+        AppLogger.lifecycle.info("Recording limit warning (4:50), showing warning in HUD")
         hudPresenter.showLimitWarning()
     }
 
@@ -194,6 +205,7 @@ public final class AppCoordinator: ObservableObject {
 
         phase = stateMachine.phase
         hudPresenter.hide()
+        AppLogger.lifecycle.info("Escape pressed, active dictation cancelled")
 
         if effects.contains(.cancelAudio) {
             activeDictationTask = Task { [audioRecorder] in
@@ -248,6 +260,7 @@ public final class AppCoordinator: ObservableObject {
             _ = stateMachine.handle(.transcriptionSaved)
             phase = stateMachine.phase
             hudPresenter.show(phase)
+            AppLogger.lifecycle.info("Focus changed before insertion, transcript saved to history")
             scheduleFeedbackExpiry(delay: 1.5)
             return
         }
@@ -258,11 +271,13 @@ public final class AppCoordinator: ObservableObject {
             _ = stateMachine.handle(.transcriptionInserted)
             phase = stateMachine.phase
             hudPresenter.show(phase)
+            AppLogger.lifecycle.info("Transcript successfully inserted and recorded")
             scheduleFeedbackExpiry(delay: 1.5)
         } else {
             _ = stateMachine.handle(.transcriptionSaved)
             phase = stateMachine.phase
             hudPresenter.show(phase)
+            AppLogger.lifecycle.warning("Synthetic insertion failed, transcript saved to history")
             scheduleFeedbackExpiry(delay: 1.5)
         }
     }
@@ -272,6 +287,7 @@ public final class AppCoordinator: ObservableObject {
         _ = stateMachine.handle(.failed(message))
         phase = stateMachine.phase
         hudPresenter.show(phase)
+        AppLogger.lifecycle.error("Dictation failure: \(message, privacy: .public)")
         scheduleFeedbackExpiry(delay: 4.0)
     }
 

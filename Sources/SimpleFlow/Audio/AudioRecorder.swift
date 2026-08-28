@@ -545,6 +545,52 @@ public final class AudioRecorder: AudioRecording, @unchecked Sendable {
         self.captureSessionFactory = captureSessionFactory
         self.temporaryDirectoryURL = temporaryDirectoryURL
         self.onDeviceFallback = onDeviceFallback
+        Self.cleanupAbandonedRecordings(in: temporaryDirectoryURL)
+    }
+
+    @discardableResult
+    public static func cleanupAbandonedRecordings(
+        in directoryURL: URL = FileManager.default.temporaryDirectory.appendingPathComponent("SimpleFlowRecordings", isDirectory: true),
+        olderThan maxAge: TimeInterval = 3600,
+        fileManager: FileManager = .default,
+        now: Date = Date()
+    ) -> Int {
+        var isDir: ObjCBool = false
+        guard fileManager.fileExists(atPath: directoryURL.path, isDirectory: &isDir), isDir.boolValue else {
+            return 0
+        }
+
+        guard let enumerator = fileManager.enumerator(
+            at: directoryURL,
+            includingPropertiesForKeys: [.contentModificationDateKey, .creationDateKey, .isRegularFileKey],
+            options: [.skipsSubdirectoryDescendants, .skipsHiddenFiles]
+        ) else {
+            return 0
+        }
+
+        var deletedCount = 0
+        for case let fileURL as URL in enumerator {
+            guard fileURL.pathExtension.lowercased() == "wav" else { continue }
+            guard let resourceValues = try? fileURL.resourceValues(forKeys: [.contentModificationDateKey, .creationDateKey, .isRegularFileKey]),
+                  resourceValues.isRegularFile == true else {
+                continue
+            }
+
+            let fileDate = resourceValues.contentModificationDate ?? resourceValues.creationDate ?? Date.distantPast
+            if now.timeIntervalSince(fileDate) >= maxAge {
+                do {
+                    try fileManager.removeItem(at: fileURL)
+                    deletedCount += 1
+                } catch {
+                    AppLogger.audio.error("Failed to remove abandoned recording \(fileURL.lastPathComponent, privacy: .public): \(error.localizedDescription, privacy: .public)")
+                }
+            }
+        }
+
+        if deletedCount > 0 {
+            AppLogger.audio.info("Cleaned up \(deletedCount) abandoned recording(s) older than 1 hour")
+        }
+        return deletedCount
     }
 
     private func prepareStart(deviceUID: String?) throws -> (URL, PCM16WAVWriter, AudioCaptureSession) {
@@ -580,10 +626,12 @@ public final class AudioRecorder: AudioRecording, @unchecked Sendable {
         state = .recording
 
         warningTimer = clock.schedule(after: 290) { [weak self] in
+            AppLogger.audio.warning("Audio recording reached 4:50 limit warning")
             self?.onLimitWarning?()
         }
 
         limitTimer = clock.schedule(after: 300) { [weak self] in
+            AppLogger.audio.warning("Audio recording reached 5:00 hard limit")
             self?.onLimitReached?()
         }
     }
@@ -600,6 +648,7 @@ public final class AudioRecorder: AudioRecording, @unchecked Sendable {
     }
 
     public func start(deviceUID: String?) async throws {
+        AppLogger.audio.info("Starting audio recording (requested device UID: \(deviceUID ?? "default", privacy: .public))")
         let (fileURL, writer, captureSession) = try prepareStart(deviceUID: deviceUID)
 
         let deviceResult: AudioDeviceSelectionResult
@@ -615,11 +664,13 @@ public final class AudioRecorder: AudioRecording, @unchecked Sendable {
                 }
             )
         } catch {
+            AppLogger.audio.error("Audio recording engine failed to start: \(error.localizedDescription, privacy: .public)")
             handleStartFailure(fileURL: fileURL)
             throw error
         }
 
         if case .fallbackToDefault(let requestedUID) = deviceResult {
+            AppLogger.audio.warning("Audio device fallback to default from requested UID: \(requestedUID, privacy: .public)")
             onDeviceFallback?(requestedUID)
         }
 
@@ -670,12 +721,15 @@ public final class AudioRecorder: AudioRecording, @unchecked Sendable {
         do {
             try writer.close()
         } catch {
+            AppLogger.audio.error("Failed to close audio writer: \(error.localizedDescription, privacy: .public)")
             finishStop(fileURL: fileURL, success: false)
             throw error
         }
 
         let duration = writer.duration
         let byteCount = writer.byteCount
+
+        AppLogger.audio.info("Stopped audio recording. Duration: \(duration, format: .fixed(precision: 2))s, Byte count: \(byteCount) bytes")
 
         finishStop(fileURL: fileURL, success: true)
         return RecordedAudio(fileURL: fileURL, duration: duration, byteCount: byteCount)
@@ -721,11 +775,13 @@ public final class AudioRecorder: AudioRecording, @unchecked Sendable {
         if let fileURL = fileURL {
             try? FileManager.default.removeItem(at: fileURL)
         }
+        AppLogger.audio.info("Cancelled audio recording and removed temporary file")
     }
 
     public func remove(_ recording: RecordedAudio) async {
         if FileManager.default.fileExists(atPath: recording.fileURL.path) {
             try? FileManager.default.removeItem(at: recording.fileURL)
+            AppLogger.audio.debug("Removed temporary recording file: \(recording.fileURL.lastPathComponent, privacy: .public)")
         }
     }
 }
