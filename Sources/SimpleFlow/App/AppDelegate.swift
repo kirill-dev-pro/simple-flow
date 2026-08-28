@@ -62,6 +62,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         viewModel.onFinish = { [weak self] in
             self?.onboardingWindowController?.close()
             self?.onboardingWindowController = nil
+            self?.coordinator?.restartHotkeyMonitor()
         }
 
         let hostingController = NSHostingController(rootView: OnboardingView(viewModel: viewModel))

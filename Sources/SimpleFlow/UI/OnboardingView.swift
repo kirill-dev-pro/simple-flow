@@ -121,5 +121,11 @@ public struct OnboardingView: View {
         .onAppear {
             viewModel.refreshPermissions()
         }
+        .onReceive(Timer.publish(every: 0.8, on: .main, in: .common).autoconnect()) { _ in
+            viewModel.refreshPermissions()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            viewModel.refreshPermissions()
+        }
     }
 }

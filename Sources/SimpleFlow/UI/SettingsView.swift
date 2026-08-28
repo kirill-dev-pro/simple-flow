@@ -155,6 +155,15 @@ public struct SettingsView: View {
         }
         .formStyle(.grouped)
         .frame(minWidth: 480, minHeight: 480)
+        .onAppear {
+            viewModel.refreshPermissions()
+        }
+        .onReceive(Timer.publish(every: 1.0, on: .main, in: .common).autoconnect()) { _ in
+            viewModel.refreshPermissions()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            viewModel.refreshPermissions()
+        }
         .sheet(isPresented: $isRecordingShortcut) {
             ShortcutRecorderSheet(currentHotkey: viewModel.hotkey) { newHotkey in
                 viewModel.hotkey = newHotkey
