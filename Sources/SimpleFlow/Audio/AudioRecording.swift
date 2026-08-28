@@ -59,6 +59,7 @@ public enum AudioRecorderError: Error, Equatable, LocalizedError {
 public protocol AudioRecording: AnyObject {
     var onLimitWarning: (@Sendable () -> Void)? { get set }
     var onLimitReached: (@Sendable () -> Void)? { get set }
+    var onDeviceFallback: (@Sendable (String) -> Void)? { get set }
     func start(deviceUID: String?) async throws
     func stop() async throws -> RecordedAudio
     func cancel() async

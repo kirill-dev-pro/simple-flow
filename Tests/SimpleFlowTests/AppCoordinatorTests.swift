@@ -38,6 +38,7 @@ final class FakeAudioRecorder: AudioRecording, @unchecked Sendable {
     private let tracker: CallsTracker
     var onLimitWarning: (@Sendable () -> Void)?
     var onLimitReached: (@Sendable () -> Void)?
+    var onDeviceFallback: (@Sendable (String) -> Void)?
 
     var startAudioCallCount = 0
     var stopAudioCallCount = 0
@@ -530,5 +531,14 @@ final class AppCoordinatorTests: XCTestCase {
         harness.coordinator.stop()
         XCTAssertFalse(harness.fakeHotkeyMonitor.isStarted)
         XCTAssertGreaterThanOrEqual(harness.fakeHUD.hideCallCount, 1)
+    }
+
+    func testAudioDeviceFallbackResetsStoredPreference() async {
+        let harness = CoordinatorHarness(transcript: "fallback")
+        harness.settingsStore.microphoneDeviceUID = "disconnected-mic-uid"
+        XCTAssertEqual(harness.settingsStore.microphoneDeviceUID, "disconnected-mic-uid")
+
+        harness.fakeRecorder.onDeviceFallback?("disconnected-mic-uid")
+        XCTAssertNil(harness.settingsStore.microphoneDeviceUID)
     }
 }

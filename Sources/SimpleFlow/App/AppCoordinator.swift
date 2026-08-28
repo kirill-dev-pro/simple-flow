@@ -67,6 +67,19 @@ public final class AppCoordinator: ObservableObject {
             }
         }
 
+        audioRecorder.onDeviceFallback = { [weak self] requestedUID in
+            AppLogger.audio.warning("Audio device '\(requestedUID, privacy: .public)' fell back to system default; resetting stored preference")
+            if Thread.isMainThread {
+                MainActor.assumeIsolated {
+                    self?.settingsStore.microphoneDeviceUID = nil
+                }
+            } else {
+                DispatchQueue.main.async { [weak self] in
+                    self?.settingsStore.microphoneDeviceUID = nil
+                }
+            }
+        }
+
         do {
             try hotkeyMonitor.start(
                 hotkey: settingsStore.hotkey,
