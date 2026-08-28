@@ -1,7 +1,7 @@
 import CoreGraphics
 import Foundation
 
-public struct Hotkey: Codable, Equatable {
+public struct Hotkey: Codable, Equatable, Sendable {
     public var keyCode: CGKeyCode?
     public var modifiersRawValue: UInt64
     public var isFunctionKeyOnly: Bool
