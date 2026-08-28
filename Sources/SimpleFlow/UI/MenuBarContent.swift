@@ -35,7 +35,11 @@ public struct MenuBarContent: View {
         }
 
         Button("History…") {
-            openWindow(id: "history")
+            if let delegate = AppDelegate.shared {
+                delegate.showHistoryWindow()
+            } else {
+                openWindow(id: "history")
+            }
         }
 
         Button("Copy Last Transcript") {
@@ -44,7 +48,11 @@ public struct MenuBarContent: View {
         .disabled(records.isEmpty)
 
         Button("Settings…") {
-            openWindow(id: "settings")
+            if let delegate = AppDelegate.shared {
+                delegate.showSettingsWindow()
+            } else {
+                openWindow(id: "settings")
+            }
         }
 
         Divider()
