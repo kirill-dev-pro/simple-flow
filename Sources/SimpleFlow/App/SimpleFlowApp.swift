@@ -1,3 +1,4 @@
+import SwiftData
 import SwiftUI
 
 @main
@@ -9,10 +10,12 @@ struct SimpleFlowApp: App {
             MenuBarContent()
         }
         Window("History", id: "history") {
-            Text("No transcripts yet")
+            HistoryView()
         }
+        .modelContainer(for: TranscriptRecord.self)
         Window("Settings", id: "settings") {
             Text("Settings")
         }
     }
 }
+
