@@ -84,6 +84,26 @@ public final class AppCoordinator: ObservableObject {
         }
     }
 
+    public func restartHotkeyMonitor() {
+        hotkeyMonitor.stop()
+        do {
+            try hotkeyMonitor.start(
+                hotkey: settingsStore.hotkey,
+                onPress: { [weak self] in
+                    self?.handleHotkeyPressed()
+                },
+                onRelease: { [weak self] in
+                    self?.handleHotkeyReleased()
+                },
+                onCancel: { [weak self] in
+                    self?.handleEscapePressed()
+                }
+            )
+        } catch {
+            handleFailure(error)
+        }
+    }
+
     public func stop() {
         hotkeyMonitor.stop()
         audioRecorder.onLimitWarning = nil

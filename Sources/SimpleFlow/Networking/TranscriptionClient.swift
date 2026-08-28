@@ -2,6 +2,13 @@ import Foundation
 
 public protocol Transcribing: Sendable {
     func transcribe(fileURL: URL, configuration: TranscriptionConfiguration) async throws -> String
+    func testConnection(configuration: TranscriptionConfiguration) async -> ConnectionTestResult
+}
+
+extension Transcribing {
+    public func testConnection(configuration: TranscriptionConfiguration) async -> ConnectionTestResult {
+        .reachable
+    }
 }
 
 public enum TranscriptionError: Error, Equatable, LocalizedError {
