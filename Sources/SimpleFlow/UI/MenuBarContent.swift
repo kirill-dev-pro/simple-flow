@@ -20,7 +20,7 @@ public struct MenuBarContent: View {
                 focusTracker: SystemFocusTracker(),
                 transcriptionClient: TranscriptionClient(),
                 textInserter: TextInserter(),
-                historyRepository: HistoryRepository(context: try! ModelContainer(for: TranscriptRecord.self).mainContext),
+                historyRepository: HistoryRepository(context: (try! DatabaseContainerFactory.create(inMemory: true)).mainContext),
                 settingsStore: SettingsStore(),
                 hudPresenter: FloatingHUDController()
             )

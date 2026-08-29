@@ -129,4 +129,12 @@ final class HistoryRepositoryTests: XCTestCase {
         record.insertionStatusRawValue = "some_future_status"
         XCTAssertEqual(record.insertionStatus, .pasteFailed)
     }
+
+    func testDatabaseContainerFactoryCreatesContainers() throws {
+        let inMemory = try DatabaseContainerFactory.create(inMemory: true)
+        XCTAssertNotNil(inMemory.mainContext)
+
+        let persistent = try DatabaseContainerFactory.create(inMemory: false)
+        XCTAssertNotNil(persistent.mainContext)
+    }
 }

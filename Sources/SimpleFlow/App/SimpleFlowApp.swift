@@ -10,12 +10,12 @@ struct SimpleFlowApp: App {
             MenuBarContent(coordinator: appDelegate.coordinator)
         }
         .menuBarExtraStyle(.window)
-        .modelContainer(for: TranscriptRecord.self)
+        .modelContainer(sharedContainer)
 
         Window("History", id: "history") {
             HistoryView()
         }
-        .modelContainer(for: TranscriptRecord.self)
+        .modelContainer(sharedContainer)
 
         Window("Settings", id: "settings") {
             if let coordinator = appDelegate.coordinator, let settingsStore = appDelegate.settingsStore {
@@ -24,7 +24,6 @@ struct SimpleFlowApp: App {
                 SettingsView(viewModel: SettingsViewModel())
             }
         }
-        .modelContainer(for: TranscriptRecord.self)
 
         Window("Welcome to Simple Flow", id: "onboarding") {
             if let settingsStore = appDelegate.settingsStore {
@@ -33,7 +32,13 @@ struct SimpleFlowApp: App {
                 OnboardingView(viewModel: OnboardingViewModel())
             }
         }
-        .modelContainer(for: TranscriptRecord.self)
+    }
+
+    private var sharedContainer: ModelContainer {
+        if let container = appDelegate.modelContainer {
+            return container
+        }
+        return try! DatabaseContainerFactory.create(inMemory: true)
     }
 
     private var menuBarIcon: String {

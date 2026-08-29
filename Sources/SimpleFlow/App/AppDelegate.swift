@@ -24,7 +24,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
         NSApp.setActivationPolicy(.accessory)
 
         do {
-            let container = try ModelContainer(for: TranscriptRecord.self)
+            let container = try DatabaseContainerFactory.create()
             self.modelContainer = container
 
             let settingsStore = SettingsStore()
