@@ -7,6 +7,7 @@ public struct MenuBarContent: View {
     @Environment(\.openWindow) private var openWindow
     @Query(sort: \TranscriptRecord.createdAt, order: .reverse) private var records: [TranscriptRecord]
     @ObservedObject private var coordinator: AppCoordinator
+    @State private var copiedRecently = false
 
     public init(coordinator: AppCoordinator? = nil) {
         if let coordinator = coordinator {
@@ -27,99 +28,249 @@ public struct MenuBarContent: View {
     }
 
     public var body: some View {
-        statusSection
+        VStack(alignment: .leading, spacing: 12) {
+            // 1. Header with App Title, Hotkey hint & Live Status Pill
+            HStack(alignment: .center) {
+                HStack(spacing: 8) {
+                    Image(systemName: "mic.fill")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .frame(width: 26, height: 26)
+                        .background(
+                            LinearGradient(
+                                colors: [Color.blue, Color.blue.opacity(0.8)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            in: RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        )
 
-        if HotkeyMonitorDiagnostic.secureInputEnabled {
-            Text("⚠️ Secure Keyboard Entry is active (may block push-to-talk)")
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text("Simple Flow")
+                            .font(.system(size: 13, weight: .semibold))
+                        Text("Hold Fn to dictate")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                Spacer()
+
+                StatusPill(phase: coordinator.phase)
+            }
+
+            // 2. Secure Input warning
+            if HotkeyMonitorDiagnostic.secureInputEnabled {
+                HStack(spacing: 6) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.orange)
+                        .font(.system(size: 11))
+                    Text("Secure Input is active (may block Fn)")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.orange)
+                }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.orange.opacity(0.12), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+            }
+
+            // 3. Latest Dictation snippet
+            if let latest = records.first {
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack {
+                        Text("Latest Dictation")
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        Text(latest.createdAt.formatted(date: .omitted, time: .shortened))
+                            .font(.system(size: 10))
+                            .foregroundStyle(.tertiary)
+                    }
+
+                    Text(latest.text)
+                        .font(.system(size: 12))
+                        .lineLimit(2)
+                        .foregroundStyle(.primary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+
+                    HStack {
+                        Spacer()
+                        Button {
+                            copyText(latest.text)
+                        } label: {
+                            HStack(spacing: 4) {
+                                Image(systemName: copiedRecently ? "checkmark" : "doc.on.doc")
+                                Text(copiedRecently ? "Copied" : "Copy")
+                            }
+                            .font(.system(size: 11, weight: .medium))
+                        }
+                        .buttonStyle(.borderless)
+                        .foregroundStyle(copiedRecently ? Color.green : Color.blue)
+                    }
+                }
+                .padding(10)
+                .background(Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+            }
+
             Divider()
-        }
 
-        Button("History…") {
-            if let delegate = AppDelegate.shared {
-                delegate.showHistoryWindow()
-            } else {
-                openWindow(id: "history")
+            // 4. Action buttons
+            VStack(spacing: 2) {
+                MenuActionButton(
+                    title: "History…",
+                    systemImage: "clock.arrow.circlepath"
+                ) {
+                    if let delegate = AppDelegate.shared {
+                        delegate.showHistoryWindow()
+                    } else {
+                        openWindow(id: "history")
+                    }
+                }
+
+                MenuActionButton(
+                    title: "Settings…",
+                    systemImage: "gearshape"
+                ) {
+                    if let delegate = AppDelegate.shared {
+                        delegate.showSettingsWindow()
+                    } else {
+                        openWindow(id: "settings")
+                    }
+                }
+            }
+
+            Divider()
+
+            // 5. Quit
+            MenuActionButton(
+                title: "Quit Simple Flow",
+                systemImage: "power",
+                shortcut: "⌘Q",
+                role: .destructive
+            ) {
+                NSApplication.shared.terminate(nil)
             }
         }
-
-        Button("Copy Last Transcript") {
-            copyLastTranscript()
-        }
-        .disabled(records.isEmpty)
-
-        Button("Settings…") {
-            if let delegate = AppDelegate.shared {
-                delegate.showSettingsWindow()
-            } else {
-                openWindow(id: "settings")
-            }
-        }
-
-        Divider()
-
-        Button("Quit Simple Flow") {
-            NSApplication.shared.terminate(nil)
-        }
-        .keyboardShortcut("q")
+        .padding(14)
+        .frame(width: 290)
     }
 
-    @ViewBuilder
-    private var statusSection: some View {
-        HStack {
-            Image(systemName: phaseIcon)
-            Text(statusTitle)
+    private func copyText(_ text: String) {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(text, forType: .string)
+        copiedRecently = true
+        Task {
+            try? await Task.sleep(nanoseconds: 1_500_000_000)
+            copiedRecently = false
         }
-        Divider()
+    }
+}
+
+private struct StatusPill: View {
+    let phase: DictationPhase
+
+    var body: some View {
+        HStack(spacing: 4) {
+            Circle()
+                .fill(statusColor)
+                .frame(width: 6, height: 6)
+            Text(statusTitle)
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(statusColor)
+        }
+        .padding(.horizontal, 7)
+        .padding(.vertical, 3)
+        .background(statusColor.opacity(0.12), in: Capsule())
     }
 
     private var statusTitle: String {
-        switch coordinator.phase {
+        switch phase {
         case .idle:
-            return "Status: Ready"
+            return "Ready"
         case .recording:
-            return "Status: Recording…"
+            return "Recording"
         case .transcribing:
-            return "Status: Transcribing…"
+            return "Transcribing"
         case .feedback(let kind):
             switch kind {
             case .inserted:
                 return "Inserted"
             case .savedToHistory:
-                return "Saved to History"
+                return "Saved"
             case .cancelled:
                 return "Cancelled"
-            case .error(let message):
-                return "Error: \(message)"
+            case .error:
+                return "Error"
             }
         }
     }
 
-    private var phaseIcon: String {
-        switch coordinator.phase {
+    private var statusColor: Color {
+        switch phase {
         case .idle:
-            return "mic"
+            return .green
         case .recording:
-            return "record.circle"
+            return .red
         case .transcribing:
-            return "waveform"
+            return .blue
         case .feedback(let kind):
             switch kind {
             case .inserted:
-                return "checkmark.circle"
+                return .green
             case .savedToHistory:
-                return "doc.on.clipboard"
+                return .blue
             case .cancelled:
-                return "xmark.circle"
+                return .secondary
             case .error:
-                return "exclamationmark.triangle"
+                return .yellow
             }
         }
     }
+}
 
-    private func copyLastTranscript() {
-        guard let latest = records.first?.text else { return }
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(latest, forType: .string)
-        AppLogger.insertion.debug("Copied latest transcript to pasteboard from menu bar")
+private struct MenuActionButton: View {
+    let title: String
+    let systemImage: String
+    var shortcut: String? = nil
+    var role: ButtonRole? = nil
+    let action: () -> Void
+
+    @State private var isHovered = false
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 8) {
+                Image(systemName: systemImage)
+                    .font(.system(size: 12))
+                    .frame(width: 16)
+                    .foregroundStyle(role == .destructive ? Color.red : Color.primary)
+
+                Text(title)
+                    .font(.system(size: 12))
+                    .foregroundStyle(role == .destructive ? Color.red : Color.primary)
+
+                Spacer()
+
+                if let shortcut = shortcut {
+                    Text(shortcut)
+                        .font(.system(size: 11))
+                        .foregroundStyle(.tertiary)
+                }
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 6)
+            .background(
+                isHovered
+                    ? (role == .destructive ? Color.red.opacity(0.1) : Color.primary.opacity(0.06))
+                    : Color.clear,
+                in: RoundedRectangle(cornerRadius: 6, style: .continuous)
+            )
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering in
+            isHovered = hovering
+        }
     }
 }

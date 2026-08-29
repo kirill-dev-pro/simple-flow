@@ -9,6 +9,7 @@ struct SimpleFlowApp: App {
         MenuBarExtra("Simple Flow", systemImage: menuBarIcon) {
             MenuBarContent(coordinator: appDelegate.coordinator)
         }
+        .menuBarExtraStyle(.window)
         .modelContainer(for: TranscriptRecord.self)
 
         Window("History", id: "history") {
