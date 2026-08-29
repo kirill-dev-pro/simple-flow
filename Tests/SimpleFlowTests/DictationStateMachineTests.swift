@@ -138,15 +138,20 @@ final class DictationStateMachineTests: XCTestCase {
         XCTAssertEqual(cancelledMachine.phase, .idle)
     }
 
+    func testFeedbackTransitions() {
+        var machine = DictationStateMachine(phase: .feedback(.inserted))
+        XCTAssertEqual(machine.handle(.hotkeyPressed), [.captureFocus, .startAudio])
+        XCTAssertEqual(machine.phase, .recording)
+
+        var escapeMachine = DictationStateMachine(phase: .feedback(.error("No speech")))
+        XCTAssertEqual(escapeMachine.handle(.escapePressed), [.cancelAudio, .returnToIdle])
+        XCTAssertEqual(escapeMachine.phase, .idle)
+    }
+
     func testIgnoredEventsInFeedback() {
         var machine = DictationStateMachine(phase: .feedback(.inserted))
-        XCTAssertEqual(machine.handle(.hotkeyPressed), [])
-        XCTAssertEqual(machine.phase, .feedback(.inserted))
 
         XCTAssertEqual(machine.handle(.hotkeyReleased), [])
-        XCTAssertEqual(machine.phase, .feedback(.inserted))
-
-        XCTAssertEqual(machine.handle(.escapePressed), [])
         XCTAssertEqual(machine.phase, .feedback(.inserted))
 
         XCTAssertEqual(machine.handle(.recordingLimitReached), [])

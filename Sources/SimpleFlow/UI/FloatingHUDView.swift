@@ -26,20 +26,21 @@ public struct FloatingHUDView: View {
     }
 
     public var body: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 10) {
             contentView
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 8)
         .background {
             Capsule()
                 .fill(.ultraThinMaterial)
-                .shadow(color: Color.black.opacity(0.25), radius: 12, x: 0, y: 6)
                 .overlay {
                     Capsule()
-                        .stroke(Color.primary.opacity(0.12), lineWidth: 0.5)
+                        .strokeBorder(Color.white.opacity(0.18), lineWidth: 0.5)
                 }
+                .shadow(color: Color.black.opacity(0.15), radius: 10, x: 0, y: 4)
         }
+        .padding(6)
         .onTapGesture {
             onDismiss?()
         }
@@ -69,7 +70,8 @@ public struct FloatingHUDView: View {
         HStack(spacing: 8) {
             Circle()
                 .fill(Color.red)
-                .frame(width: 10, height: 10)
+                .frame(width: 8, height: 8)
+                .shadow(color: Color.red.opacity(0.6), radius: 3)
 
             if let startDate = state.recordingStartDate {
                 TimelineView(.periodic(from: startDate, by: 0.5)) { context in
@@ -86,9 +88,6 @@ public struct FloatingHUDView: View {
                 Text("10s remaining")
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(.orange)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
-                    .background(Color.orange.opacity(0.15), in: Capsule())
             }
 
             Text("Esc to cancel")
@@ -111,37 +110,37 @@ public struct FloatingHUDView: View {
     private func feedbackView(for kind: FeedbackKind) -> some View {
         switch kind {
         case .inserted:
-            HStack(spacing: 8) {
+            HStack(spacing: 6) {
                 Image(systemName: "checkmark.circle.fill")
                     .foregroundStyle(.green)
-                    .imageScale(.medium)
+                    .imageScale(.small)
                 Text("Inserted")
                     .font(.system(size: 13, weight: .medium))
             }
 
         case .savedToHistory:
-            HStack(spacing: 8) {
+            HStack(spacing: 6) {
                 Image(systemName: "doc.text.fill")
                     .foregroundStyle(.blue)
-                    .imageScale(.medium)
+                    .imageScale(.small)
                 Text("Saved to History")
                     .font(.system(size: 13, weight: .medium))
             }
 
         case .cancelled:
-            HStack(spacing: 8) {
+            HStack(spacing: 6) {
                 Image(systemName: "xmark.circle.fill")
                     .foregroundStyle(.secondary)
-                    .imageScale(.medium)
+                    .imageScale(.small)
                 Text("Cancelled")
                     .font(.system(size: 13, weight: .medium))
             }
 
         case .error(let message):
-            HStack(spacing: 8) {
+            HStack(spacing: 6) {
                 Image(systemName: "exclamationmark.triangle.fill")
                     .foregroundStyle(.yellow)
-                    .imageScale(.medium)
+                    .imageScale(.small)
                 Text(message)
                     .font(.system(size: 13, weight: .medium))
                     .lineLimit(1)

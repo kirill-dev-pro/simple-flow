@@ -42,7 +42,7 @@ public struct DictationStateMachine: Sendable {
 
     public mutating func handle(_ event: DictationEvent) -> [DictationEffect] {
         switch (phase, event) {
-        case (.idle, .hotkeyPressed):
+        case (.idle, .hotkeyPressed), (.feedback, .hotkeyPressed):
             phase = .recording
             return [.captureFocus, .startAudio]
 
@@ -50,7 +50,7 @@ public struct DictationStateMachine: Sendable {
             phase = .transcribing
             return [.stopAndTranscribe]
 
-        case (.recording, .escapePressed):
+        case (.recording, .escapePressed), (.feedback, .escapePressed):
             phase = .idle
             return [.cancelAudio, .returnToIdle]
 

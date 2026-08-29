@@ -38,6 +38,46 @@ if [ -f "${REPO_ROOT}/Packaging/AppIcon.icns" ]; then
 fi
 
 echo "Signing SimpleFlow.app..."
-codesign --force --sign - "${APP_BUNDLE}"
+CERT_NAME="SimpleFlow CodeSign"
+if ! security find-identity -p codesigning | grep -q "${CERT_NAME}"; then
+    echo "Creating persistent local signing certificate '${CERT_NAME}'..."
+    TMP_DIR="$(mktemp -d)"
+    cat <<EOF > "${TMP_DIR}/codesign.cnf"
+[ req ]
+default_bits        = 2048
+distinguished_name  = req_distinguished_name
+prompt              = no
+x509_extensions     = v3_codesign
+
+[ req_distinguished_name ]
+CN = ${CERT_NAME}
+
+[ v3_codesign ]
+keyUsage = critical, digitalSignature
+extendedKeyUsage = critical, codeSigning
+basicConstraints = critical, CA:FALSE
+EOF
+
+    openssl req -x509 -newkey rsa:2048 -nodes -days 3650 \
+      -keyout "${TMP_DIR}/codesign.key" \
+      -out "${TMP_DIR}/codesign.crt" \
+      -config "${TMP_DIR}/codesign.cnf" 2>/dev/null
+
+    openssl pkcs12 -export -out "${TMP_DIR}/codesign.p12" \
+      -inkey "${TMP_DIR}/codesign.key" \
+      -in "${TMP_DIR}/codesign.crt" \
+      -password pass:simpleflow \
+      -name "${CERT_NAME}" \
+      -legacy 2>/dev/null
+
+    security import "${TMP_DIR}/codesign.p12" -k ~/Library/Keychains/login.keychain-db -P simpleflow -A >/dev/null 2>&1 || true
+    rm -rf "${TMP_DIR}"
+fi
+
+if security find-identity -p codesigning | grep -q "${CERT_NAME}"; then
+    codesign --force --deep --sign "${CERT_NAME}" "${APP_BUNDLE}"
+else
+    codesign --force --sign - "${APP_BUNDLE}"
+fi
 
 echo "Built and signed: ${APP_BUNDLE}"

@@ -35,10 +35,12 @@ public final class FloatingHUDController: HUDPresenting {
             self?.hide()
         }
         let hostingView = NSHostingView(rootView: initialView)
+        hostingView.wantsLayer = true
+        hostingView.layer?.backgroundColor = NSColor.clear.cgColor
         self.hostingView = hostingView
 
         let panel = NonActivatingPanel(
-            contentRect: NSRect(x: 0, y: 0, width: 320, height: 48),
+            contentRect: NSRect(x: 0, y: 0, width: 240, height: 40),
             styleMask: [.nonactivatingPanel, .borderless],
             backing: .buffered,
             defer: false
@@ -112,9 +114,8 @@ public final class FloatingHUDController: HUDPresenting {
         }
 
         hostingView?.layoutSubtreeIfNeeded()
-        let fittingSize = hostingView?.fittingSize ?? NSSize(width: 260, height: 48)
-        let size = NSSize(width: max(fittingSize.width, 180), height: max(fittingSize.height, 44))
-        panel.setContentSize(size)
+        let fittingSize = hostingView?.fittingSize ?? NSSize(width: 200, height: 40)
+        panel.setContentSize(fittingSize)
 
         positionPanel(panel)
         panel.orderFront(nil)

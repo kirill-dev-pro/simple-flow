@@ -209,6 +209,9 @@ public final class AppCoordinator: ObservableObject {
     }
 
     public func handleEscapePressed() {
+        feedbackTimerTask?.cancel()
+        feedbackTimerTask = nil
+
         let effects = stateMachine.handle(.escapePressed)
         guard !effects.isEmpty else { return }
 
