@@ -9,8 +9,13 @@
     <img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="License: MIT">
   </p>
   <p>
-    📖 <strong><a href="https://kcrz.dev/blog/simple-flow-macos-dictation/">Read the Blog Post</a></strong> &bull; 
-    🇷🇺 <strong><a href="https://kcrz.dev/blog/simple-flow-macos-dictation-ru/">Читать на русском</a></strong> &bull; 
+    📖 <strong>Read the Story:</strong> 
+    <a href="https://kcrz.dev/blog/simple-flow-macos-dictation/">English</a> &bull; 
+    <a href="https://kcrz.dev/blog/simple-flow-macos-dictation-ru/">Русский</a> &bull; 
+    <a href="https://kcrz.dev/blog/simple-flow-macos-dictation-es/">Español</a> &bull; 
+    <a href="https://kcrz.dev/blog/simple-flow-macos-dictation-de/">Deutsch</a> &bull; 
+    <a href="https://kcrz.dev/blog/simple-flow-macos-dictation-fr/">Français</a> &bull; 
+    <a href="https://kcrz.dev/blog/simple-flow-macos-dictation-zh/">中文</a> &bull; 
     🌐 <strong><a href="https://kcrz.dev">kcrz.dev</a></strong>
   </p>
 </div>
