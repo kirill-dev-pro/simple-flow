@@ -12,6 +12,8 @@ public struct MenuBarContent: View {
     public init(coordinator: AppCoordinator? = nil) {
         if let coordinator = coordinator {
             self.coordinator = coordinator
+        } else if let appDelegateCoordinator = AppDelegate.shared?.coordinator {
+            self.coordinator = appDelegateCoordinator
         } else {
             // Fallback for previews
             self.coordinator = AppCoordinator(
@@ -20,7 +22,7 @@ public struct MenuBarContent: View {
                 focusTracker: SystemFocusTracker(),
                 transcriptionClient: TranscriptionClient(),
                 textInserter: TextInserter(),
-                historyRepository: HistoryRepository(context: (try! DatabaseContainerFactory.create(inMemory: true)).mainContext),
+                historyRepository: HistoryRepository(context: DatabaseContainerFactory.shared.mainContext),
                 settingsStore: SettingsStore(),
                 hudPresenter: FloatingHUDController()
             )
@@ -75,48 +77,21 @@ public struct MenuBarContent: View {
                 .background(Color.orange.opacity(0.12), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
             }
 
-            // 3. Latest Dictation snippet
-            if let latest = records.first {
-                VStack(alignment: .leading, spacing: 6) {
-                    HStack {
-                        Text("Latest Dictation")
-                            .font(.system(size: 10, weight: .medium))
-                            .foregroundStyle(.secondary)
-                        Spacer()
-                        Text(latest.createdAt.formatted(date: .omitted, time: .shortened))
-                            .font(.system(size: 10))
-                            .foregroundStyle(.tertiary)
-                    }
-
-                    Text(latest.text)
-                        .font(.system(size: 12))
-                        .lineLimit(2)
-                        .foregroundStyle(.primary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-
-                    HStack {
-                        Spacer()
-                        Button {
-                            copyText(latest.text)
-                        } label: {
-                            HStack(spacing: 4) {
-                                Image(systemName: copiedRecently ? "checkmark" : "doc.on.doc")
-                                Text(copiedRecently ? "Copied" : "Copy")
-                            }
-                            .font(.system(size: 11, weight: .medium))
-                        }
-                        .buttonStyle(.borderless)
-                        .foregroundStyle(copiedRecently ? Color.green : Color.blue)
-                    }
-                }
-                .padding(10)
-                .background(Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-            }
-
             Divider()
 
-            // 4. Action buttons
+            // 3. Action buttons
             VStack(spacing: 2) {
+                MenuActionButton(
+                    title: copiedRecently ? "Copied to clipboard!" : lastDictationTitle,
+                    systemImage: copiedRecently ? "checkmark" : "doc.on.doc",
+                    iconColor: copiedRecently ? .green : nil,
+                    isDisabled: records.isEmpty
+                ) {
+                    if let latest = records.first {
+                        copyText(latest.text)
+                    }
+                }
+
                 MenuActionButton(
                     title: "History…",
                     systemImage: "clock.arrow.circlepath"
@@ -142,7 +117,7 @@ public struct MenuBarContent: View {
 
             Divider()
 
-            // 5. Quit
+            // 4. Quit
             MenuActionButton(
                 title: "Quit Simple Flow",
                 systemImage: "power",
@@ -156,13 +131,38 @@ public struct MenuBarContent: View {
         .frame(width: 290)
     }
 
+    private var lastDictationTitle: String {
+        guard let latest = records.first else {
+            return "Copy last transcript"
+        }
+        let clean = latest.text
+            .components(separatedBy: .whitespacesAndNewlines)
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
+        if clean.isEmpty {
+            return "Copy last transcript"
+        }
+        if clean.count > 26 {
+            let prefix = clean.prefix(25)
+            return "Copy: \"\(prefix)…\""
+        } else {
+            return "Copy: \"\(clean)\""
+        }
+    }
+
     private func copyText(_ text: String) {
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(text, forType: .string)
-        copiedRecently = true
+        withAnimation(.easeInOut(duration: 0.15)) {
+            copiedRecently = true
+        }
         Task {
             try? await Task.sleep(nanoseconds: 1_500_000_000)
-            copiedRecently = false
+            await MainActor.run {
+                withAnimation(.easeInOut(duration: 0.15)) {
+                    copiedRecently = false
+                }
+            }
         }
     }
 }
@@ -234,6 +234,8 @@ private struct MenuActionButton: View {
     let systemImage: String
     var shortcut: String? = nil
     var role: ButtonRole? = nil
+    var iconColor: Color? = nil
+    var isDisabled: Bool = false
     let action: () -> Void
 
     @State private var isHovered = false
@@ -244,11 +246,13 @@ private struct MenuActionButton: View {
                 Image(systemName: systemImage)
                     .font(.system(size: 12))
                     .frame(width: 16)
-                    .foregroundStyle(role == .destructive ? Color.red : Color.primary)
+                    .foregroundStyle(iconColor ?? (role == .destructive ? Color.red : Color.primary))
 
                 Text(title)
                     .font(.system(size: 12))
                     .foregroundStyle(role == .destructive ? Color.red : Color.primary)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
 
                 Spacer()
 
@@ -261,7 +265,7 @@ private struct MenuActionButton: View {
             .padding(.horizontal, 8)
             .padding(.vertical, 6)
             .background(
-                isHovered
+                !isDisabled && isHovered
                     ? (role == .destructive ? Color.red.opacity(0.1) : Color.primary.opacity(0.06))
                     : Color.clear,
                 in: RoundedRectangle(cornerRadius: 6, style: .continuous)
@@ -269,8 +273,12 @@ private struct MenuActionButton: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .disabled(isDisabled)
+        .opacity(isDisabled ? 0.45 : 1.0)
         .onHover { hovering in
-            isHovered = hovering
+            if !isDisabled {
+                isHovered = hovering
+            }
         }
     }
 }

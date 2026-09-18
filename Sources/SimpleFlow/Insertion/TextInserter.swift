@@ -65,11 +65,13 @@ public final class TextInserter: TextInserting, @unchecked Sendable {
     private let scheduler: PasteRestorationScheduling
     private let restorationDelay: TimeInterval
 
+    public static let defaultRestorationDelay: TimeInterval = 0.5
+
     public init(
         pasteboard: PasteboardManaging = PasteboardClient(),
         eventPoster: EventPosting = SystemEventPoster(),
         scheduler: PasteRestorationScheduling = AsyncTimerRestorationScheduler(),
-        restorationDelay: TimeInterval = 0.25
+        restorationDelay: TimeInterval = defaultRestorationDelay
     ) {
         self.pasteboard = pasteboard
         self.eventPoster = eventPoster

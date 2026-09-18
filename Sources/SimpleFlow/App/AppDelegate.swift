@@ -2,10 +2,11 @@ import AppKit
 import SwiftData
 import SwiftUI
 
-public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
+@MainActor
+public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, ObservableObject {
     public static private(set) var shared: AppDelegate?
 
-    public private(set) var coordinator: AppCoordinator?
+    @Published public private(set) var coordinator: AppCoordinator?
     public private(set) var modelContainer: ModelContainer?
     public private(set) var settingsStore: SettingsStore?
 
@@ -16,6 +17,24 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
     public override init() {
         super.init()
         AppDelegate.shared = self
+
+        let container = DatabaseContainerFactory.shared
+        self.modelContainer = container
+
+        let settingsStore = SettingsStore()
+        self.settingsStore = settingsStore
+
+        let coordinator = AppCoordinator(
+            hotkeyMonitor: HotkeyMonitor(),
+            audioRecorder: AudioRecorder(),
+            focusTracker: SystemFocusTracker(),
+            transcriptionClient: TranscriptionClient(),
+            textInserter: TextInserter(),
+            historyRepository: HistoryRepository(context: container.mainContext),
+            settingsStore: settingsStore,
+            hudPresenter: FloatingHUDController()
+        )
+        self.coordinator = coordinator
     }
 
     public func applicationDidFinishLaunching(_ notification: Notification) {
@@ -23,33 +42,11 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
         AppLogger.lifecycle.info("Simple Flow launched (bundleID: \(AppIdentity.bundleIdentifier, privacy: .public))")
         NSApp.setActivationPolicy(.accessory)
 
-        do {
-            let container = try DatabaseContainerFactory.create()
-            self.modelContainer = container
+        AudioRecorder.cleanupAbandonedRecordings()
+        coordinator?.start()
 
-            let settingsStore = SettingsStore()
-            self.settingsStore = settingsStore
-
-            AudioRecorder.cleanupAbandonedRecordings()
-
-            let coordinator = AppCoordinator(
-                hotkeyMonitor: HotkeyMonitor(),
-                audioRecorder: AudioRecorder(),
-                focusTracker: SystemFocusTracker(),
-                transcriptionClient: TranscriptionClient(),
-                textInserter: TextInserter(),
-                historyRepository: HistoryRepository(context: container.mainContext),
-                settingsStore: settingsStore,
-                hudPresenter: FloatingHUDController()
-            )
-            self.coordinator = coordinator
-            coordinator.start()
-
-            if !settingsStore.hasCompletedOnboarding {
-                showOnboardingWindow()
-            }
-        } catch {
-            AppLogger.lifecycle.error("Failed to initialize SimpleFlow dependencies: \(error.localizedDescription, privacy: .public)")
+        if settingsStore?.hasCompletedOnboarding == false {
+            showOnboardingWindow()
         }
     }
 

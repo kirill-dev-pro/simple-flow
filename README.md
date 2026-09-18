@@ -73,7 +73,7 @@ Under the hood, all state transitions are managed by a pure, deterministic state
 
 ### Option 1: Download Release (Recommended)
 
-1. Download the latest `SimpleFlow-v1.0.0.zip` from [**Releases**](https://github.com/kirill-dev-pro/simple-flow/releases/latest).
+1. Download the latest `SimpleFlow-v1.1.0.zip` from [**Releases**](https://github.com/kirill-dev-pro/simple-flow/releases/latest).
 2. Unzip and drag `SimpleFlow.app` into your `/Applications` folder.
 3. Open **Simple Flow** from Applications or Spotlight.
 4. Open **Settings** from the menu bar item, enter your transcription server URL and API token, and grant the required system permissions.

@@ -119,6 +119,22 @@ final class FakeRestorationScheduler: PasteRestorationScheduling, @unchecked Sen
 }
 
 final class TextInserterTests: XCTestCase {
+    func testDefaultRestorationDelayIsHalfSecond() async {
+        let fakePasteboard = FakePasteboardManager(initialText: "clip")
+        let fakePoster = FakeEventPoster(shouldSucceed: true)
+        let fakeScheduler = FakeRestorationScheduler()
+
+        let inserter = TextInserter(
+            pasteboard: fakePasteboard,
+            eventPoster: fakePoster,
+            scheduler: fakeScheduler
+        )
+
+        _ = await inserter.insert("hello")
+        XCTAssertEqual(fakeScheduler.lastDelay, 0.5)
+        XCTAssertEqual(TextInserter.defaultRestorationDelay, 0.5)
+    }
+
     func testInsertSuccessAndScheduledRestoration() async {
         let fakePasteboard = FakePasteboardManager(initialText: "original user copy")
         let fakePoster = FakeEventPoster(shouldSucceed: true)

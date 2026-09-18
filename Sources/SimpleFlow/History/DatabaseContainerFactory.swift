@@ -2,6 +2,14 @@ import Foundation
 import SwiftData
 
 public enum DatabaseContainerFactory {
+    public static let shared: ModelContainer = {
+        do {
+            return try create(inMemory: false)
+        } catch {
+            fatalError("Failed to initialize persistent DatabaseContainer: \(error)")
+        }
+    }()
+
     public static func create(inMemory: Bool = false) throws -> ModelContainer {
         let schema = Schema([TranscriptRecord.self])
 

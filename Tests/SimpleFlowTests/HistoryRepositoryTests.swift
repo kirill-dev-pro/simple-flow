@@ -137,4 +137,12 @@ final class HistoryRepositoryTests: XCTestCase {
         let persistent = try DatabaseContainerFactory.create(inMemory: false)
         XCTAssertNotNil(persistent.mainContext)
     }
+
+    @MainActor
+    func testDatabaseContainerFactorySharedSingleton() {
+        let shared1 = DatabaseContainerFactory.shared
+        let shared2 = DatabaseContainerFactory.shared
+        XCTAssertNotNil(shared1.mainContext)
+        XCTAssertTrue(shared1 === shared2)
+    }
 }
